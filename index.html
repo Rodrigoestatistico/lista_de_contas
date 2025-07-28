@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Lista de Tarefas com Filtros</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #eef3f9;
+      display: flex;
+      justify-content: center;
+      padding-top: 50px;
+    }
+
+    .container {
+      background: white;
+      padding: 30px;
+      border-radius: 10px;
+      box-shadow: 0 0 10px #ccc;
+      width: 450px;
+    }
+
+    .container h2 {
+      text-align: center;
+    }
+
+    .input-group {
+      display: flex;
+      gap: 5px;
+      margin-bottom: 10px;
+    }
+
+    .input-group input {
+      padding: 5px;
+      flex: 1;
+    }
+
+    .input-group button {
+      padding: 5px 10px;
+      background-color: #2563eb;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+
+    .filtros {
+      display: flex;
+      justify-content: center;
+      margin-bottom: 10px;
+      gap: 5px;
+    }
+
+    .filtros button {
+      padding: 5px 10px;
+      border: none;
+      border-radius: 5px;
+      background-color: #ddd;
+      cursor: pointer;
+    }
+
+    .filtros button.ativo {
+      background-color: #2563eb;
+      color: white;
+    }
+
+    .task {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: #f9f9f9;
+      border-left: 5px solid #2563eb;
+      margin: 5px 0;
+      padding: 10px;
+      border-radius: 5px;
+    }
+
+    .task.vencida {
+      border-left: 5px solid red;
+      background-color: #ffe5e5;
+    }
+
+    .task.concluida {
+      text-decoration: line-through;
+      opacity: 0.6;
+    }
+
+    .task span {
+      flex: 1;
+      margin-left: 10px;
+    }
+
+    .remove-btn {
+      background-color: red;
+      border: none;
+      color: white;
+      border-radius: 50%;
+      width: 24px;
+      height: 24px;
+      cursor: pointer;
+    }
+
+    input[type="checkbox"] {
+      transform: scale(1.2);
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>Lista de Tarefas</h2>
+
+    <div class="input-group">
+      <input type="text" id="tarefa" placeholder="Nome da tarefa" />
+      <input type="number" id="valor" placeholder="Valor (R$)" />
+    </div>
+    <div class="input-group">
+      <input type="date" id="vencimento" />
+      <button onclick="adicionarTarefa()">Adicionar</button>
+    </div>
+
+	<div id="totais" style="margin-bottom:10px; font-weight:bold;">
+	  <div style="text-align:right;">Ativas: R$ <span id="totalAtivas">0,00</span></div>
+	  <div style="text-align:right;">Concluídas: R$ <span id="totalConcluidas">0,00</span></div>
+	</div>
+
+
+	<div id="totalContas" style="text-align:right; margin-bottom:10px; font-weight:bold;">
+	  Total: R$ 0,00
+	</div>
+
+    <div id="listaTarefas"></div>
+  </div>
+
+<!-- Mesma estrutura HTML e CSS de antes -->
+<!-- Apenas atualizei o JavaScript abaixo com localStorage -->
+
+<script>
+  const lista = document.getElementById('listaTarefas');
+  let tarefas = JSON.parse(localStorage.getItem('tarefas')) || [];
+  let filtroAtual = 'todas';
+
+  function salvarTarefas() {
+    localStorage.setItem('tarefas', JSON.stringify(tarefas));
+  }
+
+  function adicionarTarefa() {
+    const nome = document.getElementById('tarefa').value;
+    const valor = document.getElementById('valor').value || 0;
+    const vencimento = document.getElementById('vencimento').value;
+
+    if (!nome || !vencimento) {
+      alert("Preencha nome e data.");
+      return;
+    }
+
+    tarefas.push({
+      nome,
+      valor,
+      vencimento,
+      concluida: false
+    });
+
+    document.getElementById('tarefa').value = '';
+    document.getElementById('valor').value = '';
+    document.getElementById('vencimento').value = '';
+
+    salvarTarefas();
+    renderizar();
+  }
+
+	function renderizar() {
+	  lista.innerHTML = '';
+	  const hoje = new Date().setHours(0, 0, 0, 0);
+	  let tarefasFiltradas = tarefas;
+
+	  if (filtroAtual === 'ativas') {
+		tarefasFiltradas = tarefas.filter(t => !t.concluida);
+	  } else if (filtroAtual === 'concluidas') {
+		tarefasFiltradas = tarefas.filter(t => t.concluida);
+	  }
+
+	  let totalAtivas = 0;
+	  let totalConcluidas = 0;
+
+	  tarefasFiltradas.forEach((tarefa, index) => {
+		const dataVenc = new Date(tarefa.vencimento).setHours(0, 0, 0, 0);
+		const vencida = dataVenc < hoje && !tarefa.concluida;
+
+		const div = document.createElement('div');
+		div.className = `task ${vencida ? 'vencida' : ''} ${tarefa.concluida ? 'concluida' : ''}`;
+		div.innerHTML = `
+		  <input type="checkbox" ${tarefa.concluida ? 'checked' : ''} onchange="toggleConcluida(${index})" />
+		  <span>
+			<strong>${tarefa.nome}</strong><br>
+			<small>Vence em: ${tarefa.vencimento}</small>
+		  </span>
+		  <span>R$ ${parseFloat(tarefa.valor).toFixed(2)}</span>
+		  <button class="remove-btn" onclick="removerTarefa(${index})">x</button>
+		`;
+		lista.appendChild(div);
+	  });
+
+	  // Calcular totais reais (de todas as tarefas, não só filtradas)
+	  tarefas.forEach(tarefa => {
+		const valor = parseFloat(tarefa.valor);
+		if (tarefa.concluida) {
+		  totalConcluidas += valor;
+		} else {
+		  totalAtivas += valor;
+		}
+	  });
+
+	  // Atualiza os totais na interface
+	  document.getElementById('totalAtivas').textContent = totalAtivas.toFixed(2);
+	  document.getElementById('totalConcluidas').textContent = totalConcluidas.toFixed(2);
+	}
+
+
+
+  function removerTarefa(index) {
+    tarefas.splice(index, 1);
+    salvarTarefas();
+    renderizar();
+  }
+
+  function toggleConcluida(index) {
+    tarefas[index].concluida = !tarefas[index].concluida;
+    salvarTarefas();
+    renderizar();
+  }
+
+  function filtrar(tipo) {
+    filtroAtual = tipo;
+    document.querySelectorAll('.filtros button').forEach(btn => btn.classList.remove('ativo'));
+    document.getElementById('btn-' + tipo).classList.add('ativo');
+    renderizar();
+  }
+
+  // Carregar ao iniciar
+  renderizar();
+</script>
